@@ -108,18 +108,13 @@ class MainActivity : ComponentActivity() {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             var showTableOfContents by remember { mutableStateOf(false) }
             var showBookmarksSheet by remember { mutableStateOf(false) }
+            var showSettingsSheet by remember { mutableStateOf(false) }
 
             MyApplicationTheme(darkTheme = isDarkMode) {
                 // Force RTL layout direction for Hebrew
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        bottomBar = {
-                            BottomNavigation(
-                                onOpenTOC = { showTableOfContents = true },
-                                onOpenBookmarks = { showBookmarksSheet = true }
-                            )
-                        }
+                        modifier = Modifier.fillMaxSize()
                     ) { innerPadding ->
                         LibraryScreen(
                             viewModel = viewModel,
@@ -131,6 +126,9 @@ class MainActivity : ComponentActivity() {
                             showBookmarksSheet = showBookmarksSheet,
                             onOpenBookmarks = { showBookmarksSheet = true },
                             onDismissBookmarks = { showBookmarksSheet = false },
+                            showSettingsSheet = showSettingsSheet,
+                            onOpenSettings = { showSettingsSheet = true },
+                            onDismissSettings = { showSettingsSheet = false },
                             modifier = Modifier.padding(innerPadding)
                         )
                     }
@@ -151,6 +149,9 @@ fun LibraryScreen(
     showBookmarksSheet: Boolean,
     onOpenBookmarks: () -> Unit,
     onDismissBookmarks: () -> Unit,
+    showSettingsSheet: Boolean,
+    onOpenSettings: () -> Unit,
+    onDismissSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(Unit) {
@@ -162,6 +163,7 @@ fun LibraryScreen(
     val paragraphs by viewModel.currentParagraphs.collectAsStateWithLifecycle()
     val cachedChapterIds by viewModel.cachedChapterIds.collectAsStateWithLifecycle()
     val textSizeSp by viewModel.textSizeSp.collectAsStateWithLifecycle()
+    val fontFamily by viewModel.fontFamily.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
@@ -214,6 +216,20 @@ fun LibraryScreen(
                 viewModel.selectChapter(chapterId)
             },
             onDismiss = onDismissTOC
+        )
+    }
+
+    if (showSettingsSheet) {
+        SettingsBottomSheet(
+            textSizeSp = textSizeSp,
+            onTextSizeChange = { viewModel.setTextSize(it) },
+            onDecreaseTextSize = { viewModel.decreaseTextSize() },
+            onIncreaseTextSize = { viewModel.increaseTextSize() },
+            fontFamily = fontFamily,
+            onFontFamilyChange = { viewModel.setFontFamily(it) },
+            isDarkMode = isDarkMode,
+            onToggleTheme = onToggleTheme,
+            onDismiss = onDismissSettings
         )
     }
 
@@ -330,73 +346,41 @@ fun LibraryScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            IconButton(
+                onClick = onOpenTOC,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .size(40.dp)
+                    .testTag("toc_button")
             ) {
-                IconButton(
-                    onClick = onOpenTOC,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .size(40.dp)
-                        .testTag("toc_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MenuBook,
-                        contentDescription = "תוכן העניינים",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                val totalSavedCount = bookmarks.size + allHighlights.size
-                IconButton(
-                    onClick = onOpenBookmarks,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .size(40.dp)
-                        .testTag("open_bookmarks_header_button")
-                ) {
-                    BadgedBox(
-                        badge = {
-                            if (totalSavedCount > 0) {
-                                Badge(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ) {
-                                    Text("$totalSavedCount")
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bookmark,
-                            contentDescription = "סימניות והדגשות",
-                            tint = if (totalSavedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Default.MenuBook,
+                    contentDescription = "תוכן העניינים",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Text(
                 text = "אורות",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
 
             IconButton(
-                onClick = onToggleTheme,
+                onClick = onOpenSettings,
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .size(40.dp)
+                    .testTag("open_settings_header_button")
             ) {
                 Icon(
-                    imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                    contentDescription = if (isDarkMode) "מעבר למצב יום" else "מעבר למצב לילה",
-                    tint = if (isDarkMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "הגדרות",
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -643,17 +627,15 @@ fun LibraryScreen(
                 }
             }
 
-            // Text Size Accessibility Controls
-            TextSizeControls(
-                textSizeSp = textSizeSp,
-                onTextSizeChange = { viewModel.setTextSize(it) },
-                onDecrease = { viewModel.decreaseTextSize() },
-                onIncrease = { viewModel.increaseTextSize() }
-            )
-
             val currentChapter = chapters.find { it.id == selectedChapterId }
             val isChapterCached = selectedChapterId != null && cachedChapterIds.contains(selectedChapterId)
             val isChapterBookmarked = selectedChapterId != null && bookmarkedTargetIds.contains(selectedChapterId)
+
+            val composeFontFamily = when(fontFamily) {
+                "serif" -> androidx.compose.ui.text.font.FontFamily.Serif
+                "monospace" -> androidx.compose.ui.text.font.FontFamily.Monospace
+                else -> androidx.compose.ui.text.font.FontFamily.SansSerif
+            }
 
             // Reading Card
             Box(
@@ -704,20 +686,40 @@ fun LibraryScreen(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                             ) {
+                                val totalSavedCount = bookmarks.size + allHighlights.size
+                                IconButton(onClick = onOpenBookmarks, modifier = Modifier.size(36.dp)) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (totalSavedCount > 0) {
+                                                Badge(
+                                                    containerColor = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                                ) {
+                                                    Text("$totalSavedCount")
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FormatListBulleted,
+                                            contentDescription = "סימניות והדגשות",
+                                            tint = if (totalSavedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
                                 Text(
                                     text = if (isSearching) "תוצאות חיפוש" else (currentChapter?.title ?: ""),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 22.sp,
+                                    fontSize = 20.sp,
                                     color = MaterialTheme.colorScheme.onBackground,
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.weight(1f, fill = false)
+                                    modifier = Modifier.weight(1f)
                                 )
 
                                 if (!isSearching && currentChapter != null) {
-                                    Spacer(modifier = Modifier.width(8.dp))
                                     IconButton(
                                         onClick = { viewModel.toggleChapterBookmark(currentChapter) },
                                         modifier = Modifier
@@ -730,27 +732,8 @@ fun LibraryScreen(
                                             tint = if (isChapterBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                                         )
                                     }
-                                }
-                            }
-
-                            if (isChapterCached && !isSearching) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudDone,
-                                        contentDescription = "שמור במכשיר לקריאה ללא אינטרנט",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "נשמר במכשיר לקריאה ללא אינטרנט",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.size(36.dp))
                                 }
                             }
                         }
@@ -794,6 +777,71 @@ fun LibraryScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp, horizontal = 8.dp)
                             ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = paragraph.paragraphLetter,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        // Feather / Note button (נוצה)
+                                        IconButton(
+                                            onClick = { paragraphForNote = paragraph },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .testTag("note_paragraph_${paragraph.id}")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.HistoryEdu,
+                                                contentDescription = if (hasNote) "הצג וערוך הערה (נוצה)" else "הוסף הערה לפסקה (נוצה)",
+                                                tint = if (hasNote) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f),
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+
+                                        // Highlight action button
+                                        IconButton(
+                                            onClick = { paragraphToHighlight = paragraph },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .testTag("highlight_btn_${paragraph.id}")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.BorderColor,
+                                                contentDescription = "הדגש פסקה או משפט",
+                                                tint = if (hasHighlight) firstHighlightColor else MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f),
+                                                modifier = Modifier.size(17.dp)
+                                            )
+                                        }
+
+                                        // Bookmark button
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.toggleParagraphBookmark(paragraph, chapterTitle)
+                                            },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .testTag("bookmark_paragraph_${paragraph.id}")
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isParagraphBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                                contentDescription = if (isParagraphBookmarked) "הסר סימניה מפסקה" else "שמור פסקה בסימניות",
+                                                tint = if (isParagraphBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.Top
@@ -864,65 +912,14 @@ fun LibraryScreen(
                                     Text(
                                         text = annotatedText,
                                         fontSize = textSizeSp.sp,
+                                        fontFamily = composeFontFamily,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.Start,
                                         lineHeight = (textSizeSp * 1.6f).sp,
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f) // Text takes all horizontal space in this row
                                     )
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        // Feather / Note button (נוצה)
-                                        IconButton(
-                                            onClick = { paragraphForNote = paragraph },
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .testTag("note_paragraph_${paragraph.id}")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.HistoryEdu,
-                                                contentDescription = if (hasNote) "הצג וערוך הערה (נוצה)" else "הוסף הערה לפסקה (נוצה)",
-                                                tint = if (hasNote) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f),
-                                                modifier = Modifier.size(19.dp)
-                                            )
-                                        }
-
-                                        // Highlight action button
-                                        IconButton(
-                                            onClick = { paragraphToHighlight = paragraph },
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .testTag("highlight_btn_${paragraph.id}")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.BorderColor,
-                                                contentDescription = "הדגש פסקה או משפט",
-                                                tint = if (hasHighlight) firstHighlightColor else MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f),
-                                                modifier = Modifier.size(17.dp)
-                                            )
-                                        }
-
-                                        // Bookmark button
-                                        IconButton(
-                                            onClick = {
-                                                viewModel.toggleParagraphBookmark(paragraph, chapterTitle)
-                                            },
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .testTag("bookmark_paragraph_${paragraph.id}")
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isParagraphBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                                contentDescription = if (isParagraphBookmarked) "הסר סימניה מפסקה" else "שמור פסקה בסימניות",
-                                                tint = if (isParagraphBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                                } // end of text row
 
                                 // Display saved note banner if present
                                 if (hasNote && existingNote != null) {
@@ -1159,85 +1156,17 @@ fun Chip(
     }
 }
 
-@Composable
-fun BottomNavigation(
-    onOpenTOC: () -> Unit = {},
-    onOpenBookmarks: () -> Unit = {}
-) {
-    var selectedItem by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("ראשי") }
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline)
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        NavItem(
-            icon = Icons.Default.Home,
-            label = "ראשי",
-            isSelected = selectedItem == "ראשי",
-            onClick = { selectedItem = "ראשי" }
-        )
-        NavItem(
-            icon = Icons.Default.MenuBook,
-            label = "תוכן ספר",
-            isSelected = selectedItem == "ספרים",
-            onClick = {
-                selectedItem = "ספרים"
-                onOpenTOC()
-            }
-        )
-        NavItem(
-            icon = Icons.Default.Bookmark,
-            label = "סימניות",
-            isSelected = selectedItem == "סימניות",
-            onClick = {
-                selectedItem = "סימניות"
-                onOpenBookmarks()
-            }
-        )
-    }
-}
-
-@Composable
-fun NavItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    shape = CircleShape
-                )
-                .padding(horizontal = 20.dp, vertical = 4.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary
-        )
+fun getChapterSectionName(title: String): String {
+    return when {
+        title.startsWith("ארץ ישראל") -> "ארץ ישראל"
+        title.startsWith("המלחמה") -> "המלחמה"
+        title.startsWith("ישראל ותחייתו") -> "ישראל ותחייתו"
+        title.startsWith("אורות התחיה") -> "אורות התחיה"
+        title.startsWith("קריאה גדולה") -> "קריאה גדולה"
+        title.startsWith("למהלך האידיאות") -> "למהלך האידיאות"
+        title.startsWith("זרעונים") -> "זרעונים"
+        title.startsWith("אורות ישראל") -> "אורות ישראל"
+        else -> "אחר"
     }
 }
 
@@ -1252,10 +1181,28 @@ fun TableOfContentsBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var filterQuery by remember { mutableStateOf("") }
-    val filteredChapters = if (filterQuery.isBlank()) {
-        chapters
-    } else {
-        chapters.filter { it.title.contains(filterQuery, ignoreCase = true) }
+    var selectedSection by remember { mutableStateOf("all") }
+
+    val sections = remember(chapters) {
+        listOf("all" to "הכל (${chapters.size})") + listOf(
+            "ארץ ישראל",
+            "המלחמה",
+            "ישראל ותחייתו",
+            "אורות התחיה",
+            "קריאה גדולה",
+            "למהלך האידיאות",
+            "זרעונים",
+            "אורות ישראל"
+        ).mapNotNull { sec ->
+            val count = chapters.count { getChapterSectionName(it.title) == sec }
+            if (count > 0) sec to "$sec ($count)" else null
+        }
+    }
+
+    val filteredChapters = chapters.filter { chapter ->
+        val matchesQuery = filterQuery.isBlank() || chapter.title.contains(filterQuery, ignoreCase = true)
+        val matchesSection = selectedSection == "all" || getChapterSectionName(chapter.title) == selectedSection
+        matchesQuery && matchesSection
     }
 
     ModalBottomSheet(
@@ -1301,7 +1248,7 @@ fun TableOfContentsBottomSheet(
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
                     Text(
-                        text = "${chapters.size} פרקים",
+                        text = "${chapters.size} פרקים ומאמרים",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1329,9 +1276,21 @@ fun TableOfContentsBottomSheet(
                         modifier = Modifier.size(18.dp)
                     )
                 },
+                trailingIcon = {
+                    if (filterQuery.isNotEmpty()) {
+                        IconButton(onClick = { filterQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "נקה",
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 8.dp)
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
@@ -1350,6 +1309,39 @@ fun TableOfContentsBottomSheet(
                 singleLine = true
             )
 
+            // Section Filter Chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                items(
+                    count = sections.size,
+                    key = { index -> sections[index].first }
+                ) { index ->
+                    val (key, label) = sections[index]
+                    val isSelected = selectedSection == key
+                    Surface(
+                        onClick = { selectedSection = key },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -1360,7 +1352,7 @@ fun TableOfContentsBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 400.dp)
+                    .heightIn(max = 440.dp)
             ) {
                 items(
                     count = filteredChapters.size,
@@ -1369,6 +1361,7 @@ fun TableOfContentsBottomSheet(
                     val chapter = filteredChapters[index]
                     val isSelected = chapter.id == selectedChapterId
                     val isCached = cachedChapterIds.contains(chapter.id)
+                    val sectionName = getChapterSectionName(chapter.title)
 
                     Surface(
                         onClick = {
@@ -1412,7 +1405,7 @@ fun TableOfContentsBottomSheet(
                                 ) {
                                     Text(
                                         text = "${chapter.orderIndex + 1}",
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                     )
@@ -1427,13 +1420,29 @@ fun TableOfContentsBottomSheet(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                     )
-                                    if (isSelected) {
-                                        Text(
-                                            text = "פרק נוכחי",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                                        ) {
+                                            Text(
+                                                text = sectionName,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Text(
+                                                text = "• פרק נוכחי",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -2236,6 +2245,143 @@ fun HighlightDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsBottomSheet(
+    textSizeSp: Float,
+    onTextSizeChange: (Float) -> Unit,
+    onDecreaseTextSize: () -> Unit,
+    onIncreaseTextSize: () -> Unit,
+    fontFamily: String,
+    onFontFamilyChange: (String) -> Unit,
+    isDarkMode: Boolean,
+    onToggleTheme: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        modifier = Modifier.testTag("settings_bottom_sheet")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "הגדרות תצוגה",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Text Size
+            Text(
+                text = "גודל גופן",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TextSizeControls(
+                textSizeSp = textSizeSp,
+                onTextSizeChange = onTextSizeChange,
+                onDecrease = onDecreaseTextSize,
+                onIncrease = onIncreaseTextSize
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Font Type
+            Text(
+                text = "סוג גופן",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    "sans_serif" to "מודרני",
+                    "serif" to "קלאסי",
+                    "monospace" to "מכונת כתיבה"
+                ).forEach { (id, label) ->
+                    val isSelected = fontFamily == id
+                    Surface(
+                        onClick = { onFontFamilyChange(id) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = label,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Dark Mode
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "מצב לילה",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "שנה את ערכת הנושא",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(
+                    checked = isDarkMode,
+                    onCheckedChange = { onToggleTheme() }
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -40,6 +40,12 @@ class LibraryRepository(
         prefs.edit().putFloat("text_size_sp", size).apply()
     }
 
+    fun getFontFamily(): String = prefs.getString("font_family", "sans_serif") ?: "sans_serif"
+
+    fun setFontFamily(fontFamily: String) {
+        prefs.edit().putString("font_family", fontFamily).apply()
+    }
+
     fun getAllBooks(): Flow<List<Book>> = dao.getAllBooks()
     
     fun getChaptersForBook(bookId: String): Flow<List<Chapter>> = dao.getChaptersForBook(bookId)
@@ -273,9 +279,9 @@ class LibraryRepository(
 
     suspend fun fetchAndSaveOrot() {
         withContext(Dispatchers.IO) {
-            val existingBooks = dao.getAllBooks().firstOrNull()
-            if (existingBooks?.isNotEmpty() == true) {
-                // Already populated
+            val count = dao.getTotalCachedParagraphsCount().firstOrNull() ?: 0
+            if (count >= 300) {
+                // Already fully populated
                 return@withContext
             }
 

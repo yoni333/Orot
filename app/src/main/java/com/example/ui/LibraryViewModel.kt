@@ -77,6 +77,9 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
     private val _textSizeSp = MutableStateFlow(repository.getTextSizeSp())
     val textSizeSp: StateFlow<Float> = _textSizeSp.asStateFlow()
 
+    private val _fontFamily = MutableStateFlow(repository.getFontFamily())
+    val fontFamily: StateFlow<String> = _fontFamily.asStateFlow()
+
     val bookmarks: StateFlow<List<Bookmark>> = repository.getAllBookmarks()
         .stateIn(
             scope = viewModelScope,
@@ -231,6 +234,11 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
 
     fun decreaseTextSize() {
         setTextSize(_textSizeSp.value - 2f)
+    }
+
+    fun setFontFamily(fontFamily: String) {
+        _fontFamily.value = fontFamily
+        repository.setFontFamily(fontFamily)
     }
 
     fun toggleChapterBookmark(chapter: Chapter) {
