@@ -22,6 +22,6 @@ data class Paragraph(
     val id: String, // e.g. "orot_orot_hatechiya_1"
     val chapterId: String,
     val textContent: String,
-    val paragraphLetter: String, // e.g. "א"
-    val orderIndex: Int
+    val paragraphLetter: String = "א", // e.g. "א"
+    val orderIndex: Int = 0
 )

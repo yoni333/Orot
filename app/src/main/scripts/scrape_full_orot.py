@@ -331,10 +331,12 @@ for order_idx, cdef in enumerate(chapter_definitions):
 
     for p_idx, p_text in enumerate(paras):
         pid = f"{cid}_p_{p_idx + 1}"
+        p_letter = hebrew_num_map.get(p_idx + 1, str(p_idx + 1))
         paragraphs.append({
             'id': pid,
             'chapterId': cid,
-            'paragraphIndex': p_idx,
+            'orderIndex': p_idx,
+            'paragraphLetter': p_letter,
             'textContent': p_text
         })
 

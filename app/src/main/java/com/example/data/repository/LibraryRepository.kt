@@ -279,13 +279,14 @@ class LibraryRepository(
 
     suspend fun fetchAndSaveOrot() {
         withContext(Dispatchers.IO) {
-            val count = dao.getTotalCachedParagraphsCount().firstOrNull() ?: 0
-            if (count >= 300) {
-                // Already fully populated
-                return@withContext
-            }
-
             try {
+                val chapterCount = dao.getChaptersForBook("orot").firstOrNull()?.size ?: 0
+                val paragraphCount = dao.getTotalCachedParagraphsCount().firstOrNull() ?: 0
+                if (chapterCount >= 146 && paragraphCount >= 300) {
+                    // Already fully populated
+                    return@withContext
+                }
+
                 val jsonString = context.assets.open("orot_data.json").bufferedReader().use { it.readText() }
                 
                 val moshi = Moshi.Builder()
@@ -299,7 +300,7 @@ class LibraryRepository(
                     dao.insertFullBookData(orotData.book, orotData.chapters, orotData.paragraphs)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("LibraryRepository", "Error parsing or inserting orot_data.json", e)
             }
         }
     }

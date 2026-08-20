@@ -22,6 +22,17 @@ import kotlinx.coroutines.launch
 
 class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() {
 
+    init {
+        fetchAndSaveOrot()
+        viewModelScope.launch {
+            repository.getChaptersForBook("orot").collect { chList ->
+                if (chList.isNotEmpty() && _selectedChapterId.value == null) {
+                    selectChapter(chList.first().id)
+                }
+            }
+        }
+    }
+
     val books: StateFlow<List<Book>> = repository.getAllBooks()
         .stateIn(
             scope = viewModelScope,
