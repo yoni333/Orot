@@ -17,56 +17,56 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
 
+      # This repo has no Gradle wrapper committed (no gradlew / gradle-wrapper.jar),
+      # so the Gradle version is pinned here instead. It must stay in sync with
+      # gradle/wrapper/gradle-wrapper.properties. AGP 9.x requires Gradle 9.x.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.1'
 
-      - name: Prepare Secrets and Environment Files
+      - name: Prepare Environment Files
         run: |
-          # Create .env from .env.example or create an empty one
-          if [ -f .env.example ]; then
-            cp .env.example .env
-          else
-            touch .env
-          fi
+          # The secrets-gradle-plugin is configured with propertiesFileName = ".env",
+          # which is gitignored, so recreate it from the checked-in example.
+          cp .env.example .env
 
-          # Decode debug.keystore if base64 file is present
+      - name: Generate Debug Keystore
+        run: |
+          # app/build.gradle.kts declares a "debugConfig" signing config pointing at
+          # <rootDir>/debug.keystore, which is gitignored. Recreate it with the
+          # standard AOSP debug credentials so :app:assembleDebug can sign.
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
-          fi
-
-      - name: Grant Execute Permission for Gradlew (if present)
-        run: |
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
+          elif [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storetype PKCS12 \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
 
       - name: Run Unit Tests
-        run: |
-          if [ -f ./gradlew ]; then
-            ./gradlew :app:testDebugUnitTest --stacktrace
-          else
-            gradle :app:testDebugUnitTest --stacktrace
-          fi
+        run: gradle :app:testDebugUnitTest --stacktrace
 
       - name: Build Debug APK
-        run: |
-          if [ -f ./gradlew ]; then
-            ./gradlew :app:assembleDebug --stacktrace
-          else
-            gradle :app:assembleDebug --stacktrace
-          fi
+        run: gradle :app:assembleDebug --stacktrace
 
       - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
@@ -74,8 +74,11 @@ jobs:
 
       - name: Upload Test Reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: unit-test-reports
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
           retention-days: 7
+          if-no-files-found: ignore
