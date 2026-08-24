@@ -85,7 +85,7 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    name: Build Release APK
+    name: Build Release Bundle (AAB) & APK
     needs: build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -109,8 +109,8 @@ jobs:
         run: cp .env.example .env
 
       # Uses the real upload key when KEYSTORE_BASE64 is configured as a repository
-      # secret. Without it the release APK is still produced, but signed with a
-      # throwaway key generated here - installable for testing, NOT publishable.
+      # secret. Without it the artifacts are still produced, but signed with a
+      # throwaway key - installable for testing, NOT publishable to Google Play.
       - name: Prepare Upload Keystore
         id: keystore
         env:
@@ -124,10 +124,10 @@ jobs:
               exit 1
             fi
             echo "$KEYSTORE_BASE64" | base64 -d > my-upload-key.jks
-            echo "artifact=app-release-apk" >> "$GITHUB_OUTPUT"
-            echo "Release APK will be signed with the configured upload key."
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+            echo "Release artifacts will be signed with the configured upload key."
           else
-            echo "::warning title=No upload key configured::KEYSTORE_BASE64 secret is not set. The release APK will be signed with a throwaway key. It is installable for testing, but it CANNOT be published to Google Play, and it can never update a listing signed with a different key."
+            echo "::warning title=No upload key configured::KEYSTORE_BASE64 secret is not set. The release AAB/APK will be signed with a throwaway key. They are installable for testing, but they CANNOT be published to Google Play, and they can never update a listing signed with a different key."
             keytool -genkeypair -v \
               -keystore my-upload-key.jks \
               -storetype PKCS12 \
@@ -138,28 +138,55 @@ jobs:
               -keysize 2048 \
               -validity 10000 \
               -dname "CN=Orot Test Signing, O=Unofficial, C=IL"
-            echo "artifact=app-release-apk-TEST-SIGNED-do-not-publish" >> "$GITHUB_OUTPUT"
+            echo "suffix=-TEST-SIGNED-do-not-publish" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build Release APK
+      # bundleRelease produces the .aab that Google Play requires for new apps.
+      # assembleRelease is kept alongside it for sideloading / direct distribution.
+      - name: Build Release Bundle (AAB) and APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'testonly' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'testonly' }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:bundleRelease :app:assembleRelease --stacktrace
 
-      - name: Verify APK Signature
+      - name: Verify Signatures
         run: |
+          AAB=$(find app/build/outputs/bundle/release -name '*.aab' | head -1)
+          echo "Built bundle: $AAB"
+          # An .aab is a jar-signed zip, so jarsigner (not apksigner) verifies it.
+          jarsigner -verify -verbose:summary -certs "$AAB" | head -40
+
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
-          echo "Built: $APK"
+          echo "Built APK: $APK"
           "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" || \
-            echo "::warning::apksigner not available; skipping signature verification."
+            echo "::warning::apksigner not available; skipping APK signature verification."
+
+      - name: Upload Release Bundle (AAB) Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: app-release-aab${{ steps.keystore.outputs.suffix }}
+          path: app/build/outputs/bundle/release/*.aab
+          retention-days: 90
+          if-no-files-found: error
+
+      # Play requires this file to deobfuscate crash reports. Harmless to upload
+      # even while minification is off - the step just no-ops if it is absent.
+      - name: Upload Native Debug Symbols & Mapping
+        uses: actions/upload-artifact@v5
+        with:
+          name: app-release-mapping${{ steps.keystore.outputs.suffix }}
+          path: |
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/outputs/native-debug-symbols/release/*.zip
+          retention-days: 90
+          if-no-files-found: ignore
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ steps.keystore.outputs.artifact }}
+          name: app-release-apk${{ steps.keystore.outputs.suffix }}
           path: app/build/outputs/apk/release/*.apk
           retention-days: 90
           if-no-files-found: error

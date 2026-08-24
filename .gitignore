@@ -16,3 +16,9 @@
 local.properties
 .env
 debug.keystore
+
+# Upload signing keystore - NEVER commit. See PUBLISHING.md
+my-upload-key.jks
+*.jks
+*.keystore
+keystore.b64.txt
