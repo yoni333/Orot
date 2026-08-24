@@ -10,7 +10,7 @@ Run all commands from the repository root:
 
 ## 0. Code changes — DONE
 
-Already applied to the repo (still uncommitted at the time of writing):
+Already applied to the repo and pushed:
 
 - `app/build.gradle.kts` — `applicationId` changed from `com.example` to
   `com.yoni.orot`. Play rejects any package name containing `com.example`.
@@ -20,6 +20,8 @@ Already applied to the repo (still uncommitted at the time of writing):
 - `app/src/androidTest/.../ExampleInstrumentedTest.kt` — package assertion
   updated to match the new applicationId.
 - `.gitignore` — keystore files excluded so they can never be committed.
+- `docker-compose.yml` + `docker/` — a containerised `keytool` so no JDK or
+  Android SDK has to be installed on your machine.
 
 Note: `namespace` is deliberately still `com.example`. It only controls where
 `R` and `BuildConfig` are generated and is invisible to Play. Renaming it would
@@ -27,71 +29,54 @@ mean moving every Kotlin source file for no benefit.
 
 ---
 
-## Steps 1-2, the fast way
-
-A script does both of the next two sections for you. It prompts for your
-password interactively, so the password is never written to disk, never
-printed, and never visible to other processes:
-
-```
-powershell -ExecutionPolicy Bypass -File .\setup-signing.ps1
-```
-
-It needs a JDK (for `keytool`) and optionally the GitHub CLI (`gh`) to set the
-secrets automatically. If either is missing it tells you exactly what to
-install. Without `gh` it still creates the keystore and writes
-`keystore.b64.txt` for you to paste into the web UI.
-
-The two sections below are the same thing done by hand - read them to
-understand what the script does, or follow them if you prefer manual control.
-
----
-
-## 1. Create the upload keystore — DO THIS ONCE
+## 1. Create the upload keystore — DO THIS ONCE, WITH DOCKER
 
 This key identifies you as the publisher. **If you lose it you can never update
 the app again** under the same listing.
 
-```
-keytool -genkeypair -v -keystore my-upload-key.jks -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 -alias upload -dname "CN=Yoni, O=Orot, C=IL"
-```
-
-It prompts for a password twice. Pick a strong one and record it in a password
-manager together with the alias (`upload`).
-
-**Back up `my-upload-key.jks` somewhere off this machine** — password manager
-attachment, encrypted cloud folder, USB drive. Not in git; `.gitignore` blocks it.
-
-Verify it was created correctly:
+Nothing needs installing on your machine — a throwaway JDK container does it.
+Start Docker Desktop, then from the repo root:
 
 ```
-keytool -list -v -keystore my-upload-key.jks -alias upload
+docker compose run --rm keystore
 ```
+
+It prompts for a password twice, then writes two files into the repo root:
+
+| File               | What it is                                          |
+|--------------------|-----------------------------------------------------|
+| `my-upload-key.jks`| your signing key — **back this up off this machine** |
+| `keystore.b64.txt` | the same key, base64 encoded, ready for GitHub       |
+
+Both are gitignored and can never be committed. The container is deleted the
+moment it exits (`--rm`); the key survives only because the repo folder is
+bind-mounted into it.
+
+Record the password in your password manager together with the alias
+(`upload`). Neither Google nor anyone else can recover it for you.
+
+The script refuses to run if `my-upload-key.jks` already exists, so it is safe
+to re-run by mistake.
 
 ---
 
 ## 2. Add the signing secrets to GitHub
 
-Convert the keystore to base64 so it can live in a GitHub secret:
+Open `keystore.b64.txt` and copy the whole thing — it is a single long line
+with no header or footer to strip.
 
-```
-certutil -encode my-upload-key.jks keystore.b64.txt
-```
-
-Open `keystore.b64.txt`, delete the `-----BEGIN CERTIFICATE-----` and
-`-----END CERTIFICATE-----` lines, and copy everything in between.
-
-Go to **GitHub repo → Settings → Secrets and variables → Actions →
-New repository secret** and add all four:
+Go to **https://github.com/yoni333/Orot/settings/secrets/actions** →
+**New repository secret**, and add all four:
 
 | Secret name       | Value                                      |
 |-------------------|--------------------------------------------|
-| `KEYSTORE_BASE64` | the base64 blob you just copied            |
-| `STORE_PASSWORD`  | the keystore password from step 1          |
-| `KEY_PASSWORD`    | same password (keytool uses one for both)  |
+| `KEYSTORE_BASE64` | the entire contents of `keystore.b64.txt`  |
+| `STORE_PASSWORD`  | the password you chose in step 1           |
+| `KEY_PASSWORD`    | the same password                          |
 | `KEY_ALIAS`       | `upload`                                   |
 
-Then delete the temporary file:
+Then delete the temporary file — the key still lives in `my-upload-key.jks`
+and in your backup:
 
 ```
 del keystore.b64.txt
@@ -103,26 +88,38 @@ That file is installable for testing but **cannot** be published.
 
 ---
 
-## 3. Build the AAB
+## 3. Build the AAB — in GitHub
 
-There is no Gradle wrapper committed and no Android SDK on this machine, so the
-build runs in GitHub Actions rather than locally.
+This is the normal path. Nothing is built on your machine.
 
-1. Commit and push to `main`.
-2. Open the repo's **Actions** tab and wait for *Android Build & Test* to finish.
-3. Open the completed run and download the **`app-release-aab`** artifact.
+1. Push to `main` (or use **Actions → Android Build & Test → Run workflow**).
+2. Wait for the run to finish at https://github.com/yoni333/Orot/actions
+3. Download the **`app-release-aab`** artifact from the finished run.
 4. Unzip it — inside is `app-release.aab`. That is the file Play wants.
 
 Also download **`app-release-mapping`** and keep it with that build. Play uses
 `mapping.txt` to make crash reports readable.
 
-Building locally instead (only if you install Android Studio + SDK):
+### Building locally instead (optional, rarely needed)
+
+Only if you are offline or debugging the build itself. This downloads the
+Android SDK into a ~3 GB image on first use and takes several minutes:
 
 ```
-gradle :app:bundleRelease
+$env:STORE_PASSWORD="your-password"
+$env:KEY_PASSWORD=$env:STORE_PASSWORD
+docker compose --profile local-build run --rm build
 ```
 
-Output lands at `app\build\outputs\bundle\release\app-release.aab`.
+Output lands at `appuild\outputsundle
+eleasepp-release.aab`.
+The Gradle cache persists in a Docker volume, so later runs are much faster.
+
+Run the unit tests the same way:
+
+```
+docker compose --profile local-build run --rm test
+```
 
 ---
 

@@ -1,0 +1,14 @@
+# core.autocrlf=true would rewrite these to CRLF on checkout, and a shell script
+# with CRLF line endings fails inside a Linux container with a "bad interpreter"
+# error. Force LF for everything that runs in Docker or CI.
+*.sh            text eol=lf
+Dockerfile*     text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+gradlew         text eol=lf
+
+# Binary - never touch.
+*.jks           binary
+*.keystore      binary
+*.webp          binary
+*.png           binary

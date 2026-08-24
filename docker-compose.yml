@@ -1,0 +1,85 @@
+# Docker-based tooling for Orot, so nothing has to be installed on the host.
+#
+# GitHub Actions is the primary build path - see PUBLISHING.md. The only thing
+# you genuinely need Docker for is creating the signing key, because the key
+# must be generated somewhere you control, not in CI.
+
+services:
+
+  # === The one you need. Run once. ===
+  #
+  #   docker compose run --rm keystore
+  #
+  # Prompts for a password, writes my-upload-key.jks and keystore.b64.txt into
+  # the repo root, then the container is thrown away. ~250 MB image, no host
+  # install. Everything after this happens in GitHub Actions.
+  keystore:
+    image: eclipse-temurin:21-jdk
+    working_dir: /work
+    volumes:
+      - .:/work
+    stdin_open: true          # the script prompts for a password
+    tty: true
+    entrypoint: ["bash", "/work/docker/make-keystore.sh"]
+
+  # === Optional escape hatch. You should not normally need this. ===
+  #
+  #   docker compose --profile local-build run --rm build
+  #
+  # Builds the signed .aab on your machine instead of in GitHub Actions.
+  # Downloads the Android SDK on first use (~3 GB image, several minutes).
+  # Prefer pushing to GitHub unless you are offline or debugging the build.
+  #
+  # Reads the keystore password from the shell that launches it, so it is never
+  # stored in this file:
+  #   $env:STORE_PASSWORD="..."; $env:KEY_PASSWORD=$env:STORE_PASSWORD
+  build:
+    profiles: ["local-build"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.android
+    working_dir: /work
+    volumes:
+      - .:/work
+      - gradle-cache:/home/builder/.gradle
+    environment:
+      KEYSTORE_PATH: /work/my-upload-key.jks
+      STORE_PASSWORD: ${STORE_PASSWORD:-}
+      KEY_PASSWORD: ${KEY_PASSWORD:-}
+      KEY_ALIAS: ${KEY_ALIAS:-upload}
+    command: >
+      bash -lc '
+        set -e
+        if [ -z "$$STORE_PASSWORD" ] || [ -z "$$KEY_PASSWORD" ]; then
+          echo "STORE_PASSWORD and KEY_PASSWORD must be set in the shell that launches this." >&2
+          exit 1
+        fi
+        [ ! -f my-upload-key.jks ] && { echo "my-upload-key.jks not found - run the keystore service first." >&2; exit 1; }
+        [ -f .env ] || cp .env.example .env
+        gradle :app:bundleRelease --stacktrace
+        echo
+        echo "AAB written to app/build/outputs/bundle/release/"
+        ls -la app/build/outputs/bundle/release/
+      '
+
+  # Optional: run the unit tests without touching the host.
+  #
+  #   docker compose --profile local-build run --rm test
+  test:
+    profiles: ["local-build"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.android
+    working_dir: /work
+    volumes:
+      - .:/work
+      - gradle-cache:/home/builder/.gradle
+    command: >
+      bash -lc '
+        set -e
+        [ -f .env ] || cp .env.example .env
+        gradle :app:testDebugUnitTest --stacktrace
+      '
+
+volumes:
+  gradle-cache:
