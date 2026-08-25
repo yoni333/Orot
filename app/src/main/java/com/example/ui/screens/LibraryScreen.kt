@@ -494,7 +494,6 @@ fun LibraryScreen(
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
         ) {
             // Chips
             if (!isSearching) {
@@ -569,7 +568,9 @@ fun LibraryScreen(
                         color = MaterialTheme.colorScheme.outline,
                         shape = RoundedCornerShape(24.dp)
                     )
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                    // No bottom padding: the reading text runs to the bottom edge of the
+                    // card, which itself now reaches the bottom of the screen.
+                    .padding(start = 24.dp, end = 24.dp, top = 20.dp),
                 contentAlignment = Alignment.Center
             ) {
                 // Quote marks background (decorative)
@@ -588,6 +589,9 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                     modifier = Modifier
                         .align(Alignment.BottomStart)
+                        // The card runs under the system nav bar now - lift the decorative
+                        // quote back above it so it does not fall off the bottom of the screen.
+                        .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
                         .offset(x = (-16).dp, y = 8.dp),
                     fontFamily = MaterialTheme.typography.titleLarge.fontFamily
                 )
@@ -595,7 +599,13 @@ fun LibraryScreen(
                 androidx.compose.foundation.lazy.LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    // The card reaches the bottom of the screen now, so the list itself
+                    // holds the last paragraph clear of the system nav bar - as content
+                    // padding it only shows at the end of the scroll, not as a fixed gap.
+                    contentPadding = PaddingValues(
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    )
                 ) {
                     item {
                         Column(

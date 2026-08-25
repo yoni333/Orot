@@ -56,7 +56,14 @@ class MainActivity : ComponentActivity() {
                             showSettingsSheet = showSettingsSheet,
                             onOpenSettings = { showSettingsSheet = true },
                             onDismissSettings = { showSettingsSheet = false },
-                            modifier = Modifier.padding(innerPadding)
+                            // Bottom inset is deliberately dropped: the reading card runs all the
+                            // way to the screen edge and the reader list carries the nav bar
+                            // inset as contentPadding instead, so there is no dead strip below it.
+                            modifier = Modifier.padding(
+                                top = innerPadding.calculateTopPadding(),
+                                start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
+                                end = innerPadding.calculateEndPadding(LocalLayoutDirection.current)
+                            )
                         )
                     }
                 }

@@ -164,7 +164,12 @@ fun SettingsBottomSheet(
                     .padding(horizontal = 8.dp)
             )
             
-            Spacer(modifier = Modifier.height(48.dp).navigationBarsPadding())
+            // The Column's 32.dp bottom padding is the ~half centimetre of clear space
+            // under the credit line; this Spacer adds the system nav bar inset on top
+            // of it so the text is never flush against the bottom of the screen.
+            // navigationBarsPadding() must come before any height() - the other way
+            // round a fixed height boxes the inset in and it contributes nothing.
+            Spacer(modifier = Modifier.navigationBarsPadding())
         }
     }
 }
