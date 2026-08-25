@@ -2386,7 +2386,7 @@ fun SettingsBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "כל התוכן הועתק מויקיטקסט והוא תחת רישיון Creative Commons ייחוס-שיתוף זהה 4.0\nליצירת קשר והוספת ספרים: yoni333@gmail.com",
+                text = "כל התוכן הועתק מויקיטקסט והוא תחת רישיון Creative Commons ייחוס-שיתוף זהה 4.0\nליצירת קשר והוספת ספרים מייל yoni333@gmail.com",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -2394,6 +2394,8 @@ fun SettingsBottomSheet(
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
             )
+            
+            Spacer(modifier = Modifier.height(48.dp).navigationBarsPadding())
         }
     }
 }
