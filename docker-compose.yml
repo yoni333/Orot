@@ -22,6 +22,30 @@ services:
     tty: true
     entrypoint: ["bash", "/work/docker/make-keystore.sh"]
 
+  # === Fast local check: does it still compile? ===
+  #
+  #   docker compose --profile local-build run --rm verify
+  #
+  # Compiles the debug Kotlin and the unit-test sources, and nothing else - no
+  # packaging, no signing, no keystore. Quickest way to catch a broken refactor
+  # before pushing to Actions. Same image as build/test, so the first run pulls
+  # the Android SDK (~3 GB); after that the shared gradle-cache makes it quick.
+  verify:
+    profiles: ["local-build"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.android
+    working_dir: /work
+    volumes:
+      - .:/work
+      - gradle-cache:/home/builder/.gradle
+    command: >
+      bash -lc '
+        set -e
+        [ -f .env ] || cp .env.example .env
+        gradle :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --stacktrace
+      '
+
   # === Optional escape hatch. You should not normally need this. ===
   #
   #   docker compose --profile local-build run --rm build

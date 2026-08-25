@@ -19,6 +19,20 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends curl unzip git ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
+# Extra root CAs, for networks that inspect TLS (Netskope, Zscaler and friends).
+# Without these, curl and Gradle both fail with "self-signed certificate in
+# certificate chain" when reaching dl.google.com or Maven Central. Drop the
+# proxy's root .crt into docker/certs/ - see the README there. The directory is
+# normally empty, in which case both steps below are no-ops.
+COPY docker/certs/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates \
+ && for c in /usr/local/share/ca-certificates/*.crt; do \
+      [ -e "$c" ] || continue; \
+      keytool -importcert -noprompt -trustcacerts \
+        -alias "$(basename "$c" .crt)" -file "$c" \
+        -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit; \
+    done
+
 # Android command-line tools + the SDK pieces the build needs.
 RUN mkdir -p "$ANDROID_HOME/cmdline-tools" \
  && curl -fsSL -o /tmp/tools.zip \

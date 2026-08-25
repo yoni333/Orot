@@ -22,3 +22,6 @@ my-upload-key.jks
 *.jks
 *.keystore
 keystore.b64.txt
+
+# Corporate TLS-proxy root CAs for the local build image - see docker/certs/README.md
+docker/certs/*.crt

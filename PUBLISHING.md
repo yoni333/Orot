@@ -121,6 +121,14 @@ Run the unit tests the same way:
 docker compose --profile local-build run --rm test
 ```
 
+To just check that the code still compiles - no packaging, no signing, no
+keystore - use the `verify` service. It is the cheapest way to catch a broken
+refactor before pushing to Actions:
+
+```
+docker compose --profile local-build run --rm verify
+```
+
 ---
 
 ## 4. Create the Play developer account
