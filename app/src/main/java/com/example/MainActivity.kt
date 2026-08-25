@@ -2380,6 +2380,20 @@ fun SettingsBottomSheet(
                     onCheckedChange = { onToggleTheme() }
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "כל התוכן הועתק מויקיטקסט והוא תחת רישיון Creative Commons ייחוס-שיתוף זהה 4.0\nליצירת קשר והוספת ספרים: yoni333@gmail.com",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+            )
         }
     }
 }

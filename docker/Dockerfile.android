@@ -1,0 +1,53 @@
+# Optional: a full Android build environment, for when you want an .aab without
+# GitHub Actions. Nothing here is needed for the normal GitHub-based flow.
+#
+# Pinned to match the CI job in .github/workflows/android.yml - JDK 21,
+# Gradle 9.5.1 (AGP 9.x requires Gradle 9.x), compileSdk 36.
+FROM eclipse-temurin:21-jdk
+
+ARG ANDROID_CMDLINE_TOOLS=13114758
+ARG GRADLE_VERSION=9.5.1
+ARG BUILD_TOOLS=36.0.0
+ARG PLATFORM=android-36
+
+ENV ANDROID_HOME=/opt/android-sdk \
+    ANDROID_SDK_ROOT=/opt/android-sdk \
+    GRADLE_USER_HOME=/home/builder/.gradle \
+    DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl unzip git ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Android command-line tools + the SDK pieces the build needs.
+RUN mkdir -p "$ANDROID_HOME/cmdline-tools" \
+ && curl -fsSL -o /tmp/tools.zip \
+      "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS}_latest.zip" \
+ && unzip -q /tmp/tools.zip -d "$ANDROID_HOME/cmdline-tools" \
+ && mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" \
+ && rm /tmp/tools.zip
+
+ENV PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+RUN yes | sdkmanager --licenses > /dev/null \
+ && sdkmanager --install \
+      "platform-tools" \
+      "platforms;${PLATFORM}" \
+      "build-tools;${BUILD_TOOLS}" > /dev/null
+
+# Gradle itself - this repo has no committed wrapper, so the version is pinned
+# here and must stay in sync with gradle/wrapper/gradle-wrapper.properties.
+RUN curl -fsSL -o /tmp/gradle.zip \
+      "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+ && unzip -q /tmp/gradle.zip -d /opt \
+ && rm /tmp/gradle.zip
+ENV PATH="/opt/gradle-${GRADLE_VERSION}/bin:$PATH"
+
+# Build as a non-root user so files written into the bind mount are not
+# root-owned on Linux hosts.
+RUN useradd -ms /bin/bash builder \
+ && mkdir -p "$GRADLE_USER_HOME" \
+ && chown -R builder:builder /home/builder
+USER builder
+
+WORKDIR /work
