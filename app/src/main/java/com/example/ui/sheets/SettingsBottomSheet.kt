@@ -44,7 +44,9 @@ fun SettingsBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp)
+                .navigationBarsPadding() // now this is the only source of the inset, so it will visibly work
         ) {
+  
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -152,24 +154,18 @@ fun SettingsBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(16.dp))
+           
 
             Text(
                 text = "כל התוכן הועתק מויקיטקסט והוא תחת רישיון Creative Commons ייחוס-שיתוף זהה 4.0\nליצירת קשר והוספת ספרים מייל yoni333@gmail.com",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             )
-            
-            // The Column's 32.dp bottom padding is the ~half centimetre of clear space
-            // under the credit line; this Spacer adds the system nav bar inset on top
-            // of it so the text is never flush against the bottom of the screen.
-            // navigationBarsPadding() must come before any height() - the other way
-            // round a fixed height boxes the inset in and it contributes nothing.
-            Spacer(modifier = Modifier.navigationBarsPadding())
+           
         }
     }
 }
