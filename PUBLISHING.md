@@ -145,30 +145,46 @@ before you need them. Confirm the current rule in the Console, as Google adjusts
 
 ---
 
-## 5. Listing assets you still need to produce
+## 5. Listing assets
 
-None of these exist in the repo yet.
-
-- [ ] **App icon, 512×512 PNG.** The app currently ships the default Android
-      Studio green-robot icon (`app/src/main/res/drawable/ic_launcher_foreground.xml`).
-      Replace it with a real icon before publishing — reviewers and users both
-      notice. Use Android Studio's *Image Asset* tool to regenerate the mipmaps.
+- [x] **App icon — done.** Generated from `docs/הרב קוק סקיצה.jpg` (the pen-and-ink
+      portrait of Rav Kook). The paper is knocked out to alpha via a luminance→alpha
+      colour matrix, so the source card's rounded border and drop shadow are gone and
+      only the ink remains; the paper tone comes from the background layer instead.
+      - `docs/icon/play-icon-512.png` — 512×512, the file Play wants (173 KB).
+      - `app/src/main/res/drawable-*dpi/ic_launcher_foreground.png` — adaptive
+        foreground, art at 64% of the 108dp canvas so it stays inside the 72dp safe zone.
+      - `app/src/main/res/drawable/ic_launcher_background.xml` — solid `#FBF9F1`.
+      - `app/src/main/res/mipmap-*dpi/ic_launcher.png` + `ic_launcher_round.png` —
+        legacy rasters for API 24–25. The old green-robot `.webp` files were deleted;
+        leaving them alongside same-named `.png` would be a duplicate-resource error.
+      - `<monochrome>` was removed from the adaptive-icon XML on purpose: a hatched
+        portrait has no readable single-colour silhouette, and the themed-mode render
+        came out as a muddy blob. Themed mode now falls back to the full-colour icon.
+      - `docs/icon/orot-icon.svg` is the earlier flame draft, superseded and unused.
+      Regenerate with `pwsh docs/icon/make-icons.ps1` (run from the repo root) if the
+      source sketch changes. It needs Windows + System.Drawing; no SDK or Docker.
 - [ ] **Feature graphic, 1024×500 PNG/JPG.**
 - [ ] **At least 2 phone screenshots** (up to 8). 16:9 or 9:16, each side between
       320px and 3840px.
-- [ ] **Short description** — max 80 characters.
-- [ ] **Full description** — max 4000 characters.
-- [ ] **Privacy policy URL** — a publicly reachable page. Required. A GitHub
-      Pages file is acceptable. The app requests `INTERNET` and
-      `ACCESS_NETWORK_STATE`, so you must state what is and isn't collected.
+- [x] **Short description** — see `docs/play-listing.md` (75/80 chars).
+- [x] **Full description** — see `docs/play-listing.md` (997/4000 chars).
+- [x] **Privacy policy page** written at `docs/privacy-policy.html` (Hebrew + English).
+      **Still to do:** publish it. GitHub repo → Settings → Pages → Deploy from a
+      branch → `main` / `/docs`. It then serves at
+      https://yoni333.github.io/Orot/privacy-policy.html — that is the URL Play wants.
+      Verify it loads in a private browser window before submitting; Play rejects
+      unreachable policy URLs.
 
 ---
 
 ## 6. Play Console forms to complete
 
-- [ ] **Data safety** — declare what the app collects. This app stores notes,
-      bookmarks and highlights locally in Room; answer honestly about whether
-      anything leaves the device.
+- [ ] **Data safety** — answer **"no data collected"**. The full text loads from
+      `app/src/main/assets/orot_data.json`; notes, bookmarks, highlights and recent
+      searches live only in the local Room database. There are no network calls at
+      all — `INTERNET` and `ACCESS_NETWORK_STATE` are declared but unused. Draft
+      answers are in `docs/play-listing.md`.
 - [ ] **Content rating questionnaire** — religious text app, should rate broadly.
 - [ ] **Target audience and content** — age groups.
 - [ ] **Ads declaration** — no ads in this app.

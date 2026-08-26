@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(command -v node jq)",
+      "Bash(node -e ' *)",
+      "Bash(command -v magick convert inkscape rsvg-convert)",
+      "Bash(cat)"
+    ]
+  }
+}
