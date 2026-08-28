@@ -164,7 +164,13 @@ before you need them. Confirm the current rule in the Console, as Google adjusts
       - `docs/icon/orot-icon.svg` is the earlier flame draft, superseded and unused.
       Regenerate with `pwsh docs/icon/make-icons.ps1` (run from the repo root) if the
       source sketch changes. It needs Windows + System.Drawing; no SDK or Docker.
-- [ ] **Feature graphic, 1024×500 PNG/JPG.**
+- [x] **Feature graphic — done.** `docs/icon/feature-graphic-1024x500.png`,
+      exactly 1024×500 PNG. Sage vertical gradient, the portrait in a paper
+      medallion on the left (deliberately echoing the launcher icon), Hebrew type
+      right-aligned: "אורות" / "הראי״ה קוק זצ״ל" / a features line. Rendered at 2x
+      and downsampled so the type stays crisp. Content is kept ~11% clear of every
+      edge, because Play re-crops this asset to different aspect ratios per surface.
+      Regenerate with `pwsh docs/icon/make-feature-graphic.ps1` from the repo root.
 - [ ] **At least 2 phone screenshots** (up to 8). 16:9 or 9:16, each side between
       320px and 3840px.
 - [x] **Short description** — see `docs/play-listing.md` (75/80 chars).

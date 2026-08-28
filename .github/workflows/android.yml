@@ -153,15 +153,45 @@ jobs:
 
       - name: Verify Signatures
         run: |
+          # No -e: the missing-apksigner path is handled explicitly below.
+          set -uo pipefail
+
           AAB=$(find app/build/outputs/bundle/release -name '*.aab' | head -1)
+          if [ -z "$AAB" ]; then echo "::error::No .aab was produced."; exit 1; fi
           echo "Built bundle: $AAB"
+
           # An .aab is a jar-signed zip, so jarsigner (not apksigner) verifies it.
-          jarsigner -verify -verbose:summary -certs "$AAB" | head -40
+          # Written to a file first: piping into head would report head's exit code
+          # and mask an unsigned or corrupt bundle.
+          jarsigner -verify -verbose:summary -certs "$AAB" > aab-verify.log 2>&1
+          RC=$?
+          head -40 aab-verify.log
+          if [ $RC -ne 0 ] || ! grep -q "jar verified" aab-verify.log; then
+            echo "::error::$AAB failed signature verification - it cannot be published."
+            exit 1
+          fi
+          echo "AAB signature verified."
 
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then echo "::error::No release .apk was produced."; exit 1; fi
           echo "Built APK: $APK"
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" || \
-            echo "::warning::apksigner not available; skipping APK signature verification."
+
+          # Several build-tools versions are installed on the runner, so an
+          # unanchored glob expands to a LIST - the first path becomes the command
+          # and the rest become arguments. Resolve the newest one explicitly.
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER=$(ls -d "$SDK"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
+            echo "Using $APKSIGNER"
+            # A failure here is a real signing problem, not a missing tool.
+            if ! "$APKSIGNER" verify --print-certs "$APK"; then
+              echo "::error::APK signature verification failed."
+              exit 1
+            fi
+            echo "APK signature verified."
+          else
+            echo "::warning::apksigner not found under $SDK; APK signature not verified. The AAB check above still ran and passed."
+          fi
 
       - name: Upload Release Bundle (AAB) Artifact
         uses: actions/upload-artifact@v5
