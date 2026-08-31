@@ -73,7 +73,7 @@ class LibraryRepository(
             } else {
                 val bookmark = Bookmark(
                     id = "chapter_${chapter.id}",
-                    type = "CHAPTER",
+                    type = Bookmark.TYPE_CHAPTER,
                     targetId = chapter.id,
                     bookId = chapter.bookId,
                     chapterId = chapter.id,
@@ -98,7 +98,7 @@ class LibraryRepository(
                 }
                 val bookmark = Bookmark(
                     id = "paragraph_${paragraph.id}",
-                    type = "PARAGRAPH",
+                    type = Bookmark.TYPE_PARAGRAPH,
                     targetId = paragraph.id,
                     bookId = "orot",
                     chapterId = paragraph.chapterId,

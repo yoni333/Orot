@@ -127,14 +127,14 @@ fun BookmarksBottomSheet(
                     FilterChip(
                         selected = selectedFilter == "chapter",
                         onClick = { selectedFilter = "chapter" },
-                        label = { Text("פרקים (${bookmarks.count { it.type == "chapter" }})") }
+                        label = { Text("פרקים (${bookmarks.count { it.type == Bookmark.TYPE_CHAPTER }})") }
                     )
                 }
                 item {
                     FilterChip(
                         selected = selectedFilter == "paragraph",
                         onClick = { selectedFilter = "paragraph" },
-                        label = { Text("פסקאות (${bookmarks.count { it.type == "paragraph" }})") }
+                        label = { Text("פסקאות (${bookmarks.count { it.type == Bookmark.TYPE_PARAGRAPH }})") }
                     )
                 }
                 item {
@@ -231,8 +231,8 @@ fun BookmarksBottomSheet(
             val showNotes = selectedFilter == "all" || selectedFilter == "note"
 
             val filteredBookmarks = when (selectedFilter) {
-                "chapter" -> bookmarks.filter { it.type == "chapter" }
-                "paragraph" -> bookmarks.filter { it.type == "paragraph" }
+                "chapter" -> bookmarks.filter { it.type == Bookmark.TYPE_CHAPTER }
+                "paragraph" -> bookmarks.filter { it.type == Bookmark.TYPE_PARAGRAPH }
                 else -> bookmarks
             }
 
@@ -496,7 +496,7 @@ fun BookmarksBottomSheet(
                             key = { index -> "bm_${filteredBookmarks[index].id}" }
                         ) { index ->
                             val bookmark = filteredBookmarks[index]
-                            val isChapter = bookmark.type == "chapter"
+                            val isChapter = bookmark.type == Bookmark.TYPE_CHAPTER
 
                             Surface(
                                 onClick = {

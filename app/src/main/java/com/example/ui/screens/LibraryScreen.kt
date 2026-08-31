@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -56,6 +57,10 @@ import com.example.ui.sheets.SettingsBottomSheet
 import com.example.ui.sheets.TableOfContentsBottomSheet
 import com.example.util.DocxExporter
 
+// The reading list puts the chapter header above the paragraphs, so paragraph n sits
+// at list index n + 1.
+private const val PARAGRAPH_LIST_HEADER_ITEMS = 1
+
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
@@ -95,6 +100,9 @@ fun LibraryScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     var paragraphToHighlight by remember { mutableStateOf<Paragraph?>(null) }
     var paragraphForNote by remember { mutableStateOf<Paragraph?>(null) }
+    // Set when a bookmark, highlight or note is opened: the chapter switch is
+    // asynchronous, so the paragraph to land on is remembered until its chapter loads.
+    var pendingParagraphId by remember { mutableStateOf<String?>(null) }
     
     val isSearching = searchQuery.isNotBlank()
     val displayParagraphs = if (isSearching) searchResults else paragraphs
@@ -125,12 +133,42 @@ fun LibraryScreen(
         }
     }
 
+    // One LazyColumn serves every chapter and the search results, so without this it
+    // keeps the offset it had - picking a chapter from the table of contents used to
+    // open it wherever the previous one was scrolled to instead of at its first
+    // paragraph. Keyed on what actually replaces the list's contents rather than on
+    // searchQuery, which changes on every keystroke while the results only change on
+    // submit. A pending paragraph takes precedence: it scrolls somewhere specific.
+    val paragraphListState = rememberLazyListState()
+    LaunchedEffect(selectedChapterId, isSearching, searchResults) {
+        if (pendingParagraphId == null) {
+            paragraphListState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(pendingParagraphId, displayParagraphs) {
+        val target = pendingParagraphId ?: return@LaunchedEffect
+        val index = displayParagraphs.indexOfFirst { it.id == target }
+        if (index >= 0) {
+            paragraphListState.scrollToItem(index + PARAGRAPH_LIST_HEADER_ITEMS)
+            pendingParagraphId = null
+        } else if (displayParagraphs.firstOrNull()?.chapterId == selectedChapterId) {
+            // The list has caught up with the chosen chapter and still does not hold
+            // the paragraph, so it is gone. Stop waiting and fall back to the top.
+            paragraphListState.scrollToItem(0)
+            pendingParagraphId = null
+        }
+    }
+
     if (showTableOfContents) {
         TableOfContentsBottomSheet(
             chapters = chapters,
             selectedChapterId = selectedChapterId,
             cachedChapterIds = cachedChapterIds,
             onSelectChapter = { chapterId ->
+                // Picking a chapter by hand always opens it at the top, and drops any
+                // paragraph left pending by a bookmark that never resolved.
+                pendingParagraphId = null
                 viewModel.selectChapter(chapterId)
             },
             onDismiss = onDismissTOC
@@ -157,18 +195,23 @@ fun LibraryScreen(
             highlights = allHighlights,
             notes = allNotes,
             onSelectBookmark = { bookmark ->
+                if (bookmark.type == Bookmark.TYPE_PARAGRAPH) {
+                    pendingParagraphId = bookmark.targetId
+                }
                 viewModel.selectChapter(bookmark.chapterId)
             },
             onDeleteBookmark = { bookmark ->
                 viewModel.removeBookmark(bookmark.id)
             },
             onSelectHighlight = { highlight ->
+                pendingParagraphId = highlight.paragraphId
                 viewModel.selectChapter(highlight.chapterId)
             },
             onDeleteHighlight = { highlight ->
                 viewModel.deleteHighlight(highlight.id)
             },
             onSelectNote = { note ->
+                pendingParagraphId = note.paragraphId
                 viewModel.selectChapter(note.chapterId)
             },
             onDeleteNote = { note ->
@@ -597,6 +640,7 @@ fun LibraryScreen(
                 )
 
                 androidx.compose.foundation.lazy.LazyColumn(
+                    state = paragraphListState,
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(18.dp),
