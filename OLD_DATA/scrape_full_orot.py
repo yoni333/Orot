@@ -1,3 +1,13 @@
+# RETIRED - do not run. Superseded by app/src/main/scripts/build_orot_data.py.
+#
+# This scraper split raw wikitext on newlines, so it invented paragraph
+# boundaries that do not exist in the book, emitted the vowelled and the
+# unvowelled copy of the same page as consecutive paragraphs, kept navigation
+# links ("לתוכן העניינים") as text, lost the content of pages that are
+# redirects, and lettered each fragment as if it were a piska of its own.
+# Running it would overwrite app/src/main/assets/orot_data.json with that data
+# again. Regenerate the asset with:  py app/src/main/scripts/build_orot_data.py
+#
 import urllib.request
 import json
 import urllib.parse

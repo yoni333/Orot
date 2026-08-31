@@ -14,7 +14,7 @@ import com.example.data.local.entities.RecentSearch
 
 @Database(
     entities = [Book::class, Chapter::class, Paragraph::class, Bookmark::class, Highlight::class, RecentSearch::class, ParagraphNote::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class LibraryDatabase : RoomDatabase() {

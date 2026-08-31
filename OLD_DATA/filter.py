@@ -1,3 +1,8 @@
+# RETIRED - do not run. See OLD_DATA/README.md.
+# This script still writes app/src/main/assets/orot_data.json relative to the
+# repo root; running it would overwrite the shipped asset with the old, broken
+# paragraph split. Regenerate with: py app/src/main/scripts/build_orot_data.py
+#
 import json
 
 with open('app/src/main/assets/orot_data.json', 'r', encoding='utf-8') as f:

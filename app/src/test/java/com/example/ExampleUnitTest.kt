@@ -23,14 +23,27 @@ class ExampleUnitTest {
 
     assertNotNull("Parsed OrotData must not be null", orotData)
     assertEquals("orot", orotData!!.book.id)
-    assertEquals(146, orotData.chapters.size)
-    assertEquals(323, orotData.paragraphs.size)
-    
-    // Check first and last paragraphs
+    assertEquals(28, orotData.chapters.size)
+    assertEquals(343, orotData.paragraphs.size)
+
     val firstP = orotData.paragraphs.first()
-    assertEquals("eretz_israel_1_p_1", firstP.id)
-    assertEquals("eretz_israel_1", firstP.chapterId)
+    assertEquals("eretz_israel_p_1", firstP.id)
+    assertEquals("eretz_israel", firstP.chapterId)
+    assertEquals("א׳", firstP.paragraphLetter)
     assertTrue("First paragraph must have content", firstP.textContent.isNotBlank())
-    assertNotNull("Paragraph letter must not be null", firstP.paragraphLetter)
+
+    // Every chapter numbers its paragraphs from alef, with no gaps or repeats.
+    val chapterIds = orotData.chapters.map { it.id }
+    assertEquals("Every paragraph belongs to a known chapter",
+        emptyList<String>(), orotData.paragraphs.map { it.chapterId }.distinct() - chapterIds.toSet())
+    orotData.paragraphs.groupBy { it.chapterId }.forEach { (chapterId, paragraphs) ->
+        val ordered = paragraphs.sortedBy { it.orderIndex }
+        assertEquals("$chapterId must be indexed from 0",
+            ordered.indices.toList(), ordered.map { it.orderIndex })
+        assertEquals("$chapterId must letter each paragraph once",
+            ordered.size, ordered.map { it.paragraphLetter }.distinct().size)
+        assertTrue("$chapterId must have no blank paragraphs",
+            ordered.all { it.textContent.isNotBlank() })
+    }
   }
 }
