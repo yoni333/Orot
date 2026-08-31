@@ -78,7 +78,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, bottom = 48.dp)
+                .padding(start = 24.dp, end = 24.dp, bottom = 48.dp)
         )
     }
 }
