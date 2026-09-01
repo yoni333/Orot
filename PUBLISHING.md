@@ -217,15 +217,27 @@ before you need them. Confirm the current rule in the Console, as Google adjusts
 
 ## 8. Every release after the first
 
-`versionCode` must increase on every single upload — Play rejects a repeat.
-Edit `app/build.gradle.kts`:
+`versionCode` must increase on every single upload — Play rejects a repeat. You do
+not bump it by hand: `app/build.gradle.kts` derives it from `GITHUB_RUN_NUMBER`, so
+every Actions run produces a higher one than the last.
 
 ```kotlin
-versionCode = 2          // was 1 — bump on EVERY upload
-versionName = "1.1"      // human-facing, your choice
+val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.plus(1)
+versionCode = ciVersionCode ?: 1     // CI: run number + 1. Local: always 1.
+versionName = "1.1"                  // human-facing, bump this by hand
 ```
 
-Push, download the new `.aab` from Actions, upload to Play.
+The `versionCode` of any given `.aab` is the run number shown beside the workflow in
+the Actions UI (`#42`), plus one. A locally built `.aab` always carries `1` and is not
+publishable — use the CI artifact.
+
+So each release is: bump `versionName` if you want a new user-facing number, push,
+download the new `.aab` from Actions, upload to Play.
+
+One thing to watch: `run_number` is counted per workflow *name*. Renaming the workflow
+in `.github/workflows/android.yml` restarts it at 1 and would drop `versionCode` below
+what is already published. If that happens, raise the offset in `app/build.gradle.kts`
+above the highest code you have uploaded.
 
 ---
 

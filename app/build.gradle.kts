@@ -9,6 +9,16 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+// Google Play rejects an upload whose versionCode was used before, and 1 is already on
+// the store. GITHUB_RUN_NUMBER only ever increases for a given workflow, so CI builds
+// derive from it and the +1 keeps every result above 1. Local builds are never
+// published, so they keep a fixed value.
+//
+// The one thing that would break this: renaming the workflow in
+// .github/workflows/android.yml resets run_number to 1, which would push versionCode
+// back below what is already published. Raise the offset if that ever happens.
+val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.plus(1)
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,8 +27,8 @@ android {
     applicationId = "com.yoni.orot"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = ciVersionCode ?: 1
+    versionName = "1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
