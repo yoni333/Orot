@@ -24,6 +24,11 @@ interface LibraryDao {
 
     @Query("SELECT * FROM paragraphs WHERE chapterId = :chapterId ORDER BY orderIndex ASC")
     fun getParagraphsForChapter(chapterId: String): Flow<List<Paragraph>>
+
+    // The whole book is a few hundred rows, so the table of contents holds all of it
+    // rather than querying a chapter at a time as the reader expands each one.
+    @Query("SELECT * FROM paragraphs ORDER BY chapterId, orderIndex ASC")
+    fun getAllParagraphs(): Flow<List<Paragraph>>
     
     @Query("SELECT * FROM paragraphs WHERE textContent LIKE '%' || :query || '%' ORDER BY chapterId, orderIndex ASC")
     fun searchParagraphs(query: String): Flow<List<Paragraph>>

@@ -79,6 +79,17 @@ class LibraryViewModel(private val repository: LibraryRepository) : ViewModel() 
             initialValue = emptyList()
         )
 
+    // Every paragraph in the book, keyed by chapter, for the table of contents. The SQL
+    // orders by chapterId then orderIndex and groupBy keeps encounter order, so each
+    // list already reads in book order.
+    val paragraphsByChapter: StateFlow<Map<String, List<Paragraph>>> = repository.getAllParagraphs()
+        .map { all -> all.groupBy { it.chapterId } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyMap()
+        )
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 

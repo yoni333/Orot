@@ -51,7 +51,9 @@ class LibraryRepository(
     fun getChaptersForBook(bookId: String): Flow<List<Chapter>> = dao.getChaptersForBook(bookId)
     
     fun getParagraphsForChapter(chapterId: String): Flow<List<Paragraph>> = dao.getParagraphsForChapter(chapterId)
-    
+
+    fun getAllParagraphs(): Flow<List<Paragraph>> = dao.getAllParagraphs()
+
     fun searchParagraphs(query: String): Flow<List<Paragraph>> = dao.searchParagraphs(query)
 
     fun getChapter(chapterId: String): Flow<Chapter> = dao.getChapter(chapterId)

@@ -175,17 +175,3 @@ fun Chip(
         }
     }
 }
-
-fun getChapterSectionName(title: String): String {
-    return when {
-        title.startsWith("ארץ ישראל") -> "ארץ ישראל"
-        title.startsWith("המלחמה") -> "המלחמה"
-        title.startsWith("ישראל ותחייתו") -> "ישראל ותחייתו"
-        title.startsWith("אורות התחיה") -> "אורות התחיה"
-        title.startsWith("קריאה גדולה") -> "קריאה גדולה"
-        title.startsWith("למהלך האידיאות") -> "למהלך האידיאות"
-        title.startsWith("זרעונים") -> "זרעונים"
-        title.startsWith("אורות ישראל") -> "אורות ישראל"
-        else -> "אחר"
-    }
-}

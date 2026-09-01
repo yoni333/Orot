@@ -5,7 +5,8 @@
       "Bash(command -v node jq)",
       "Bash(node -e ' *)",
       "Bash(command -v magick convert inkscape rsvg-convert)",
-      "Bash(cat)"
+      "Bash(cat)",
+      "PowerShell(cd \"c:\\\\Users\\\\yehonatany\\\\code\\\\personal\\\\Orot\"; foreach \\($f in @\\('app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\ui\\\\sheets\\\\TableOfContentsBottomSheet.kt','app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\ui\\\\screens\\\\LibraryScreen.kt','app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\ui\\\\LibraryViewModel.kt','app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\ui\\\\components\\\\ReaderComponents.kt'\\)\\) { $t=Get-Content $f -Raw; $o=\\([regex]::Matches\\($t,'\\\\{'\\)\\).Count; $c=\\([regex]::Matches\\($t,'\\\\}'\\)\\).Count; $p=\\([regex]::Matches\\($t,'\\\\\\('\\)\\).Count; $q=\\([regex]::Matches\\($t,'\\\\\\)'\\)\\).Count; \"{0,-60} braces {1}/{2}  parens {3}/{4}\" -f \\(Split-Path $f -Leaf\\),$o,$c,$p,$q })"
     ]
   }
 }

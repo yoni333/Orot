@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,6 +65,11 @@ import com.example.util.DocxExporter
 // at list index n + 1.
 private const val PARAGRAPH_LIST_HEADER_ITEMS = 1
 
+// A request to scroll the reader onto one paragraph. requestId makes every request a
+// distinct value, so asking for the same paragraph twice - jump to it, scroll away,
+// jump back - still moves the list instead of writing an unchanged state.
+private data class ParagraphJump(val paragraphId: String, val requestId: Int)
+
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
@@ -87,6 +93,7 @@ fun LibraryScreen(
     val chapters by viewModel.chapters.collectAsStateWithLifecycle()
     val selectedChapterId by viewModel.selectedChapterId.collectAsStateWithLifecycle()
     val paragraphs by viewModel.currentParagraphs.collectAsStateWithLifecycle()
+    val paragraphsByChapter by viewModel.paragraphsByChapter.collectAsStateWithLifecycle()
     val cachedChapterIds by viewModel.cachedChapterIds.collectAsStateWithLifecycle()
     val textSizeSp by viewModel.textSizeSp.collectAsStateWithLifecycle()
     val fontFamily by viewModel.fontFamily.collectAsStateWithLifecycle()
@@ -103,9 +110,15 @@ fun LibraryScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     var paragraphToHighlight by remember { mutableStateOf<Paragraph?>(null) }
     var paragraphForNote by remember { mutableStateOf<Paragraph?>(null) }
-    // Set when a bookmark, highlight or note is opened: the chapter switch is
-    // asynchronous, so the paragraph to land on is remembered until its chapter loads.
-    var pendingParagraphId by remember { mutableStateOf<String?>(null) }
+    // Set when a paragraph is opened from the table of contents, a bookmark, a highlight
+    // or a note: the chapter switch is asynchronous, so the paragraph to land on is
+    // remembered until its chapter loads.
+    var pendingJump by remember { mutableStateOf<ParagraphJump?>(null) }
+    var jumpCounter by remember { mutableIntStateOf(0) }
+    val requestParagraphJump: (String) -> Unit = { paragraphId ->
+        jumpCounter += 1
+        pendingJump = ParagraphJump(paragraphId, jumpCounter)
+    }
     // The search field and the recent-search chips took the top of every screen even
     // when nobody was searching; the header toggle brings them in on demand. Saved
     // rather than remembered because the query itself lives in the view model: a
@@ -149,34 +162,46 @@ fun LibraryScreen(
     // submit. A pending paragraph takes precedence: it scrolls somewhere specific.
     val paragraphListState = rememberLazyListState()
     LaunchedEffect(selectedChapterId, isSearching, searchResults) {
-        if (pendingParagraphId == null) {
+        if (pendingJump == null) {
             paragraphListState.scrollToItem(0)
         }
     }
 
-    LaunchedEffect(pendingParagraphId, displayParagraphs) {
-        val target = pendingParagraphId ?: return@LaunchedEffect
+    LaunchedEffect(pendingJump, displayParagraphs) {
+        val target = pendingJump?.paragraphId ?: return@LaunchedEffect
         val index = displayParagraphs.indexOfFirst { it.id == target }
         if (index >= 0) {
             paragraphListState.scrollToItem(index + PARAGRAPH_LIST_HEADER_ITEMS)
-            pendingParagraphId = null
+            pendingJump = null
         } else if (displayParagraphs.firstOrNull()?.chapterId == selectedChapterId) {
             // The list has caught up with the chosen chapter and still does not hold
             // the paragraph, so it is gone. Stop waiting and fall back to the top.
             paragraphListState.scrollToItem(0)
-            pendingParagraphId = null
+            pendingJump = null
         }
     }
 
     if (showTableOfContents) {
         TableOfContentsBottomSheet(
             chapters = chapters,
+            paragraphsByChapter = paragraphsByChapter,
             selectedChapterId = selectedChapterId,
             cachedChapterIds = cachedChapterIds,
             onSelectChapter = { chapterId ->
                 // Picking a chapter by hand always opens it at the top, and drops any
                 // paragraph left pending by a bookmark that never resolved.
-                pendingParagraphId = null
+                pendingJump = null
+                viewModel.selectChapter(chapterId)
+            },
+            onSelectParagraph = { chapterId, paragraphId ->
+                // A jump from the contents leaves search mode: the target paragraph is
+                // almost never in the current result set, and the request would sit
+                // unresolved until the query happened to be cleared.
+                if (isSearching) {
+                    viewModel.updateSearchQuery("")
+                    isSearchVisible = false
+                }
+                requestParagraphJump(paragraphId)
                 viewModel.selectChapter(chapterId)
             },
             onDismiss = onDismissTOC
@@ -204,7 +229,7 @@ fun LibraryScreen(
             notes = allNotes,
             onSelectBookmark = { bookmark ->
                 if (bookmark.type == Bookmark.TYPE_PARAGRAPH) {
-                    pendingParagraphId = bookmark.targetId
+                    requestParagraphJump(bookmark.targetId)
                 }
                 viewModel.selectChapter(bookmark.chapterId)
             },
@@ -212,14 +237,14 @@ fun LibraryScreen(
                 viewModel.removeBookmark(bookmark.id)
             },
             onSelectHighlight = { highlight ->
-                pendingParagraphId = highlight.paragraphId
+                requestParagraphJump(highlight.paragraphId)
                 viewModel.selectChapter(highlight.chapterId)
             },
             onDeleteHighlight = { highlight ->
                 viewModel.deleteHighlight(highlight.id)
             },
             onSelectNote = { note ->
-                pendingParagraphId = note.paragraphId
+                requestParagraphJump(note.paragraphId)
                 viewModel.selectChapter(note.chapterId)
             },
             onDeleteNote = { note ->
