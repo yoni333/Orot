@@ -26,10 +26,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -103,6 +106,11 @@ fun LibraryScreen(
     // Set when a bookmark, highlight or note is opened: the chapter switch is
     // asynchronous, so the paragraph to land on is remembered until its chapter loads.
     var pendingParagraphId by remember { mutableStateOf<String?>(null) }
+    // The search field and the recent-search chips took the top of every screen even
+    // when nobody was searching; the header toggle brings them in on demand. Saved
+    // rather than remembered because the query itself lives in the view model: a
+    // rotation would otherwise leave results on screen with the search bar gone.
+    var isSearchVisible by rememberSaveable { mutableStateOf(false) }
     
     val isSearching = searchQuery.isNotBlank()
     val displayParagraphs = if (isSearching) searchResults else paragraphs
@@ -299,17 +307,18 @@ fun LibraryScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Header
-        Row(
+        // Header. A Box rather than a SpaceBetween Row so the title stays on the true
+        // centre of the screen: the trailing side carries two buttons and the leading
+        // side one, which would pull a Row-centred title off to the start.
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             IconButton(
                 onClick = onOpenTOC,
                 modifier = Modifier
+                    .align(Alignment.CenterStart)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .size(40.dp)
@@ -327,207 +336,248 @@ fun LibraryScreen(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center)
             )
 
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .size(40.dp)
-                    .testTag("open_settings_header_button")
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "הגדרות",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                IconButton(
+                    onClick = {
+                        // Closing the search also clears the query, so the reader is
+                        // never left showing results with no visible way back.
+                        if (isSearchVisible) {
+                            viewModel.updateSearchQuery("")
+                            keyboardController?.hide()
+                        }
+                        isSearchVisible = !isSearchVisible
+                    },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(
+                            if (isSearchVisible) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .size(40.dp)
+                        .testTag("toggle_search_button")
+                ) {
+                    Icon(
+                        imageVector = if (isSearchVisible) Icons.Default.SearchOff else Icons.Default.Search,
+                        contentDescription = if (isSearchVisible) "סגור חיפוש" else "חיפוש",
+                        tint = if (isSearchVisible) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .size(40.dp)
+                        .testTag("open_settings_header_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "הגדרות",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
 
-        // Search Bar
-        TextField(
-            value = searchQuery,
-            onValueChange = { viewModel.updateSearchQuery(it) },
-            placeholder = { 
-                Text(
-                    text = "חפש בכתבי הרב...",
-                    color = MaterialTheme.colorScheme.secondary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                viewModel.submitSearchQuery(searchQuery)
-                                keyboardController?.hide()
-                            },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .testTag("submit_search_button")
+        if (isSearchVisible) {
+            // Search Bar
+            val searchFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                searchFocusRequester.requestFocus()
+            }
+            TextField(
+                value = searchQuery,
+                onValueChange = { viewModel.updateSearchQuery(it) },
+                placeholder = { 
+                    Text(
+                        text = "חפש בכתבי הרב...",
+                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 4.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "בצע חיפוש ושמור",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                viewModel.updateSearchQuery("")
-                            },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .testTag("clear_search_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "נקה טקסט",
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            IconButton(
+                                onClick = {
+                                    viewModel.submitSearchQuery(searchQuery)
+                                    keyboardController?.hide()
+                                },
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .testTag("submit_search_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "בצע חיפוש ושמור",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    viewModel.updateSearchQuery("")
+                                },
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .testTag("clear_search_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "נקה טקסט",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(
-                onSearch = {
-                    viewModel.submitSearchQuery(searchQuery)
-                    keyboardController?.hide()
-                }
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = if (recentSearches.isNotEmpty()) 8.dp else 16.dp)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline,
-                    shape = CircleShape
-                )
-                .testTag("search_text_field"),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
-            shape = CircleShape,
-            singleLine = true
-        )
-
-        // Recent Searches Bar
-        if (recentSearches.isNotEmpty()) {
-            Row(
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        viewModel.submitSearchQuery(searchQuery)
+                        keyboardController?.hide()
+                    }
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.History,
-                    contentDescription = "חיפושים קודמים",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "אחרונים:",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                LazyRow(
+                    .padding(bottom = if (recentSearches.isNotEmpty()) 8.dp else 16.dp)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = CircleShape
+                    )
+                    .focusRequester(searchFocusRequester)
+                    .testTag("search_text_field"),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
+                shape = CircleShape,
+                singleLine = true
+            )
+
+            // Recent Searches Bar
+            if (recentSearches.isNotEmpty()) {
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .testTag("recent_searches_row"),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(
-                        count = recentSearches.size,
-                        key = { index -> recentSearches[index].query }
-                    ) { index ->
-                        val item = recentSearches[index]
-                        val isCurrentQuery = searchQuery == item.query
-                        Surface(
-                            onClick = {
-                                viewModel.submitSearchQuery(item.query)
-                                keyboardController?.hide()
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isCurrentQuery) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(
-                                1.dp,
-                                if (isCurrentQuery) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.testTag("recent_search_chip_${item.query}")
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = "חיפושים קודמים",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "אחרונים:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    LazyRow(
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("recent_searches_row"),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items(
+                            count = recentSearches.size,
+                            key = { index -> recentSearches[index].query }
+                        ) { index ->
+                            val item = recentSearches[index]
+                            val isCurrentQuery = searchQuery == item.query
+                            Surface(
+                                onClick = {
+                                    viewModel.submitSearchQuery(item.query)
+                                    keyboardController?.hide()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isCurrentQuery) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isCurrentQuery) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.testTag("recent_search_chip_${item.query}")
                             ) {
-                                Text(
-                                    text = item.query,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isCurrentQuery) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (isCurrentQuery) FontWeight.Bold else FontWeight.Medium
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            viewModel.deleteRecentSearch(item.query)
-                                        }
-                                        .testTag("delete_recent_search_${item.query}"),
-                                    contentAlignment = Alignment.Center
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "מחק חיפוש",
-                                        tint = if (isCurrentQuery) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.size(12.dp)
+                                    Text(
+                                        text = item.query,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isCurrentQuery) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (isCurrentQuery) FontWeight.Bold else FontWeight.Medium
                                     )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                viewModel.deleteRecentSearch(item.query)
+                                            }
+                                            .testTag("delete_recent_search_${item.query}"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "מחק חיפוש",
+                                            tint = if (isCurrentQuery) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "נקה הכל",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { viewModel.clearAllRecentSearches() }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .testTag("clear_all_recent_searches_button")
+                    )
                 }
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "נקה הכל",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { viewModel.clearAllRecentSearches() }
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                        .testTag("clear_all_recent_searches_button")
-                )
             }
         }
 
@@ -544,13 +594,13 @@ fun LibraryScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(bottom = 12.dp)
                 ) {
-                    item {
+                   /* item {
                         Chip(
                             text = "תוכן העניינים ☰",
                             isSelected = false,
                             onClick = onOpenTOC
                         )
-                    }
+                    } */
                     item {
                         Chip(
                             text = "סימניות (${bookmarks.size})",
