@@ -208,7 +208,9 @@ before you need them. Confirm the current rule in the Console, as Google adjusts
    `my-upload-key.jks` stays the *upload* key; Google holds the *app signing*
    key and can help you recover if the upload key is ever lost.
 4. Upload `app-release.aab`.
-5. Upload `mapping.txt` under the same release if not attached automatically.
+5. Nothing else to attach. There is no `mapping.txt` — minification is off on
+   purpose, so traces are already readable — and the native debug symbols travel
+   inside the `.aab` itself. See *Crash reports* below.
 6. Write release notes, roll out to internal testing, and install on your own
    device to confirm it works when signed by Google.
 7. Promote internal → closed (the 14-day / 12-tester run) → production.
@@ -241,12 +243,54 @@ above the highest code you have uploaded.
 
 ---
 
+## Crash reports
+
+Crashes and ANRs are collected by **Google Play, not by the app**: Play Console →
+**Quality → Android vitals → Crashes and ANRs**. There is no crash-reporting SDK in
+this project and there should not be one — the privacy policy at `docs/index.html`
+promises, in Hebrew and English, that the app collects nothing, transmits nothing and
+talks to no server, and the Data Safety form answers "no data collected". Firebase
+Crashlytics would contradict all three and would need a Firebase project plus a
+`google-services.json` secret in CI. Android vitals costs none of that, because the
+collection happens on Google's side of the line, not the app's.
+
+What to expect from it:
+
+- Only users who enabled **"share usage and diagnostics"** on their device are counted,
+  so a small testing track may show nothing at all. It reports on installs, not on
+  uploads — an `.aab` sitting in a track with no testers produces no data.
+- Reports are aggregated and lag by hours. This is not a live debugger.
+- No custom logs, no breadcrumbs, no non-fatal exceptions. Those need an SDK.
+
+Two Play upload warnings are expected here and are **not** worth chasing:
+
+- *"No deobfuscation file"* — correct and harmless. `isMinifyEnabled = false`, so the
+  code is not obfuscated and there is nothing to deobfuscate. Play cannot tell the
+  difference, so it offers the tip every time.
+- *"Native code without debug symbols"* — this one is handled. `app/build.gradle.kts`
+  sets `ndk { debugSymbolLevel = "SYMBOL_TABLE" }` on the release build type, so AGP
+  embeds `native-debug-symbols.zip` in the bundle under `BUNDLE-METADATA/` and Play
+  reads it on upload. The `.so` files come from dependencies
+  (`androidx.graphics:graphics-path`, via Compose UI) rather than from this project,
+  and vendors usually ship them stripped, so how much the symbols actually resolve is
+  worth checking rather than assuming.
+
+To confirm the symbols really shipped, before uploading:
+
+```
+unzip -l app-release.aab | grep -i debugsymbols
+```
+
+---
+
 ## Known gaps, not blockers
 
 - **`isMinifyEnabled = false`** in `app/build.gradle.kts`. Legal to publish, just
   a larger download. It is off on purpose: enabling R8 without keep-rules risks
   breaking Room and Moshi, which resolve classes reflectively. Worth revisiting
-  with proper `proguard-rules.pro` entries once the app is stable.
+  with proper `proguard-rules.pro` entries once the app is stable — but note it is
+  not free: R8 is what *creates* the need for a `mapping.txt`, without which the
+  Android vitals traces stop being readable. See *Crash reports*.
 - **Default theme name** `Theme.MyApplication` and the unused purple/teal colors
   in `res/values/colors.xml` are template leftovers. Cosmetic and internal only.
 - **`google-services.json` is absent.** Fine — the plugin is configured with

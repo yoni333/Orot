@@ -53,6 +53,12 @@ android {
     release {
       isCrunchPngs = false
       isMinifyEnabled = false
+
+      // Dependencies ship prebuilt .so files (androidx.graphics:graphics-path, pulled in
+      // by Compose UI), so Play flags the bundle as containing native code. Emitting a
+      // symbol table lets AGP embed native-debug-symbols.zip in the AAB, which Play picks
+      // up on upload - native crash frames then resolve to names, not raw addresses.
+      ndk { debugSymbolLevel = "SYMBOL_TABLE" }
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
